@@ -16,15 +16,21 @@ require_once PLASMATURE_TYPES_INC."default.php";
  */
 class hiddenType extends defaultType
 {
+	/** @access private */
+	var $type_valid_args = array(
+		'changeable',
+		);
+
 	var $type = 'hidden';
 	var $_hidden = true;
+	var $changeable = false;
 	
 	function grab()
 	{
 		$value = $this->grab_value();
-		if($value !== NULL && $value != $this->get() && preg_replace('/\s+/','',$value) != preg_replace('/\s+/','',$this->get()))
+		if(!$this->changeable && $value !== NULL && $value != $this->get() && preg_replace('/\s+/','',$value) != preg_replace('/\s+/','',$this->get()))
 		{
-			trigger_error('hidden element ('.$this->name.') value changed in userland. This is deprecated (insecure) behavior and will not be allowed in future releases.');
+			trigger_error('hidden element ('.$this->name.') value changed in userland. This is deprecated (insecure) behavior and will not be allowed in future releases. If changes are expected to this plasmature set its changeable option to true.');
 		}
 		parent::grab();
 	}
