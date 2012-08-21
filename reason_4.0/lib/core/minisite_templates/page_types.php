@@ -62,6 +62,9 @@
 			'sub_nav_3' => '',
 			'post_foot' => '',
 		),
+		'map' => array(
+			'main_post' => 'map',
+		),
 		'a_to_z' => array(
 			'banner_xtra' => '',
 			'navigation' => '',

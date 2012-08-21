@@ -9,6 +9,9 @@ reason_include_once('classes/entity_selector.php');
 
 $GLOBALS['_reason_upgraders']['4.1_to_4.2']['map_and_location'] = 'ReasonUpgrader_MapAndLocation';
 
+/**
+ * @todo add map_to_group as an allowable relationship
+ */
 class ReasonUpgrader_MapAndLocation implements reasonUpgraderInterface
 {
 	protected $user_id;
@@ -101,6 +104,7 @@ class ReasonUpgrader_MapAndLocation implements reasonUpgraderInterface
 		$buf = '';
 		$buf .= $this->add_location_type('test');
 		$buf .= $this->add_map_type('test');
+		$buf .= $this->add_allowable_relationships('test');
 		return $buf;
 	}
 	/**
@@ -113,6 +117,7 @@ class ReasonUpgrader_MapAndLocation implements reasonUpgraderInterface
 		$buf = '';
 		$buf .= $this->add_location_type('run');
 		$buf .= $this->add_map_type('run');
+		$buf .= $this->add_allowable_relationships('run');
 		return $buf;
 	}
 	
@@ -228,6 +233,49 @@ class ReasonUpgrader_MapAndLocation implements reasonUpgraderInterface
 			$was_successful = true;
 			return $buf;
 		}
+	}
+	
+	// Assumes that the map type and location types have been created.
+	function add_allowable_relationships($mode)
+	{
+		$buf = '';
+		$relationship_arrays = array($this->map_relationships, $this->location_relationships);
+		
+		foreach ($relationship_arrays as $relationship_array)
+		{
+			foreach ($relationship_array as $relationship)
+			{
+				if (reason_relationship_name_exists($relationship['name'], false))
+				{
+					echo '<p>'.$relationship['name'].' already exists. No need to update.</p>'."\n";
+				}
+				else
+				{	
+					if ($mode == 'run')
+					{
+						$r_id = create_allowable_relationship(id_of($relationship['a_side']), id_of($relationship['b_side']), $relationship['name'], $relationship['details']);
+						if($r_id)
+						{
+							$buf .= '<p>'.$relationship['name'].' allowable relationship successfully created</p>'."\n";
+						}
+						else
+						{
+							$buf .= '<p>Unable to create '.$relationship['name'].' allowable relationship</p>';
+							$buf .= '<p>You might try creating the relationship '.$relationship['name'].' yourself in the reason administrative interface - it should include the following characteristics:</p>';
+							ob_start();
+							pray ($relationship['details']);
+							$buf .= ob_get_contents();
+							ob_clean();
+						}
+					}
+					else
+					{
+						$buf .= '<p>Would have created alowable relationship with name '.$relationship['name'].'</p>'."\n";
+					}
+				}
+			}
+		}
+		return $buf;
 	}
 	
 	/**
