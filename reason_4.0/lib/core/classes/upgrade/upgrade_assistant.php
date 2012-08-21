@@ -39,32 +39,35 @@ class reasonUpgradeAssistant
 		{
 			foreach($files as $file)
 			{
-				reason_include_once($dir_path.$file);
-				$name = basename($file, '.php');
-				if(!empty($GLOBALS['_reason_upgraders'][$upgrade_string][$name]))
+				if (strlen($file) >= 4 && substr($file, -4,4) == '.php')
 				{
-					$classname = $GLOBALS['_reason_upgraders'][$upgrade_string][$name];
-					if(class_exists($classname))
+					reason_include_once($dir_path.$file);
+					$name = basename($file, '.php');
+					if(!empty($GLOBALS['_reason_upgraders'][$upgrade_string][$name]))
 					{
-						$obj = new $classname;
-						if($obj instanceof reasonUpgraderInterface)
-							$upgraders['upgraders'][$name] = new $classname;
-						elseif ($obj instanceof reasonUpgraderInfoInterface)
+						$classname = $GLOBALS['_reason_upgraders'][$upgrade_string][$name];
+						if(class_exists($classname))
 						{
-							$upgraders['upgrade_info'][$name] = new $classname;
+							$obj = new $classname;
+							if($obj instanceof reasonUpgraderInterface)
+								$upgraders['upgraders'][$name] = new $classname;
+							elseif ($obj instanceof reasonUpgraderInfoInterface)
+							{
+								$upgraders['upgrade_info'][$name] = new $classname;
+							}
+							else
+							{
+								trigger_error('Upgraders must implement the reasonUpgraderInterface or the reasonUpgraderInfoInterface; '.$classname.' appears not to.');
+							}
 						}
 						else
-						{
-							trigger_error('Upgraders must implement the reasonUpgraderInterface or the reasonUpgraderInfoInterface; '.$classname.' appears not to.');
-						}
+							trigger_error('Unable to instantiate upgrader class '.$classname.' -- it does not appear to exist');
 					}
 					else
-						trigger_error('Unable to instantiate upgrader class '.$classname.' -- it does not appear to exist');
-				}
-				else
-				{
-					trigger_error('The upgrader file '.$file.' does not appear to have registered itself properly. At the top of the file there should be'.
-							' a declaration like this: $GLOBALS[\'_reason_upgraders\'][\''.$upgrade_string.'\'][\''.$name.'\'] = \'NameOfUpgraderClass\'');
+					{
+						trigger_error('The upgrader file '.$file.' does not appear to have registered itself properly. At the top of the file there should be'.
+								' a declaration like this: $GLOBALS[\'_reason_upgraders\'][\''.$upgrade_string.'\'][\''.$name.'\'] = \'NameOfUpgraderClass\'');
+					}
 				}
 			}
 		}
