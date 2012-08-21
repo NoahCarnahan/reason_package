@@ -57,7 +57,7 @@ class MapModule extends DefaultMinisiteModule
 		
 		$this->get_head_items()->add_javascript(JQUERY_URL, true);
 		$this->parent->add_head_item('script', array('language' => 'JavaScript', 'type' => 'text/javascript', 'src' =>'//maps.googleapis.com/maps/api/js?sensor=false'), ' ');
-		$this->parent->add_head_item('script', array('language' => 'JavaScript', 'type' => 'text/javascript', 'src' => '/global_stock/js/google_maps_V3.js'), ' ');
+		$this->parent->add_head_item('script', array('language' => 'JavaScript', 'type' => 'text/javascript', 'src' => '/reason/modules/map/google_maps_V3.js'), ' ');
 
 		$this->es = new entity_selector();
 		$this->es->description = 'Selecting maps for this page';
@@ -75,8 +75,10 @@ class MapModule extends DefaultMinisiteModule
 		$addresses = $this->es->run_one();         
 		
 		// If there are addresses associated with this map...
+		//echo '<p>About to check for associated addresses</p>';
 		if (!empty($addresses))
 		{
+			//echo '<p>There are associated addresses</p>';
 			foreach ($addresses as $address) {
 				$lat = $address->get_value('latitude');
 				$lon = $address->get_value('longitude');
@@ -391,7 +393,7 @@ class MapModule extends DefaultMinisiteModule
 	}
 	
 	function run()
-	{			
+	{
 		foreach($this->maps as $map) {
 			$this->_get_cache_data($map);
 			$this->mapItems[$map->id()] = array();
