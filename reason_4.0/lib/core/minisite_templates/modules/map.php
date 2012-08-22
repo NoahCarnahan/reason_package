@@ -4,11 +4,16 @@ reason_include_once( 'minisite_templates/modules/default.php' );
 reason_include_once( 'classes/group_helper.php' );
 //include_once( SETTINGS_INC . 'map_settings.php' );
 include_once( CARL_UTIL_INC . 'dir_service/directory.php' );
+include_once(THOR_INC . 'thor.php');
 //include_once(WEB_PATH . 'alumni/directory/search/person.php');
 reason_include_once('classes/geocoder.php'); // in core/classes
 
 /**
- * @todo Remove uneaded includes
+ * @todo Should there be a message when you should be logged in?
+ * @todo figure out what the form_selectset_nav does
+ * @todo ONLY SUPPORTS ONE FILTER! IS this bad?
+ *
+ * @todo Remove uneeded includes
  * @todo Update the suporting javascript to support multiple maps per page.
  */
 class MapModule extends DefaultMinisiteModule
@@ -130,15 +135,145 @@ class MapModule extends DefaultMinisiteModule
 		}
 	}
 	
+	/**
+	 * Helper function for map_from_form(). Takes a row (array returned from $tc->get_row)
+	 * a ThorCore and a $this->params key.
+	 */
+	private function _get_value_from_row($row, $tc, $param)
+	{
+		return $row[$tc->get_column_name($this->params[$param])];
+	}
+	
+	/**
+	 * Checks the form related parameters passed to the module and returns a form id if
+	 * valid parameters have been passed, otherwise returns false.
+	 */
+	private function _get_form_id()
+	{
+		if(!empty($this->params['form_name'])) {
+			$form_id = id_of($this->params['form_name']);
+			if(!empty($form_id)) {
+				if(!empty($this->params['form_address_full']) || !empty($this->params['form_address_city'])){
+					return $form_id;
+				}
+			}
+		}
+		return false;
+	}
+	
 	function map_from_form($map)
 	{
-		if(!empty($this->params['form_name']))
+		//First check for the existence of a valid form
+		if ($form_id = $this->_get_form_id())
 		{
-			$form_id = id_of($this->params['form_name']);
-			if(!empty($form_id))
+			$form = new entity($form_id);
+			$xml = $form->get_value('thor_content');
+			$table = 'form_' . $form->id();
+			$tc = new ThorCore($xml, $table);
+			
+			if ($this->params['thor_filters'])
 			{
-				if(!empty($this->params['form_address_full']) || !empty($this->params['form_address_city']))
+				//Get filters
+				reset($this->params['thor_filters']);
+				$filter_column = key($this->params['thor_filters']);
+				$filter_value = $this->params['thor_filters'][$filter_column];
+				$rows = $tc->get_rows_for_key($filter_value, $tc->get_column_name($filter_column));
+			} else {
+				$rows = $tc->get_rows();
+			}
+			
+			if ($rows)
+			{
+				foreach ($rows as $row)
 				{
+					if ($this->params['form_address_full'])
+					{
+						//If a full address is given, use that for the geocoding address
+						$geo_addr = $this->_get_value_from_row($row, $tc, 'form_address_full');
+						$display = ($this->params['form_address_name'] && $this->_get_value_from_row($row, $tc, 'form_address_name')) ? htmlspecialchars($this->_get_value_from_row($row, $tc, 'form_address_name'), ENT_QUOTES) . '<br />' : '';
+						// Someone may want to figure out how to split the address into multiple lines for display
+						$display  .= htmlspecialchars($geo_addr);
+						
+					} else {
+						//If a full address is not given, build up a geocoding address from the other fields.
+						if ($this->params['form_address_city'] && $this->_get_value_from_row($row, $tc, 'form_address_city'))
+							$city_plus = $this->_get_value_from_row($row, $tc, 'form_address_city') . ', ';
+						if ($this->params['form_address_state'] && $this->_get_value_from_row($row, $tc, 'form_address_state'))
+							$city_plus .= $this->_get_value_from_row($row, $tc, 'form_address_state') . ' ';
+						if ($this->params['form_address_post_code'] && $this->_get_value_from_row($row, $tc, 'form_address_post_code'))
+							$city_plus .= $this->_get_value_from_row($row, $tc, 'form_address_post_code') . ' ';
+						if ($this->params['form_address_country'] && $this->_get_value_from_row($row, $tc, 'form_address_country'))
+							$city_plus .= $this->_get_value_from_row($row, $tc, 'form_address_country') . ' ';
+							
+						if ($this->params['form_address_street2'] && $this->_get_value_from_row($row, $tc, 'form_address_street2'))
+							$geo_addr = $this->_get_value_from_row($row, $tc, 'form_address_street2') . ', ' . $city_plus; 
+						elseif ($this->params['form_address_street1'] && $this->_get_value_from_row($row, $tc, 'form_address_street1')) 
+							$geo_addr = $this->_get_value_from_row($row, $tc, 'form_address_street1') . ', ' . $city_plus;
+						else
+							$geo_addr = $city_plus;
+							
+						// Build up the text of the info bubble
+						$display = ($this->params['form_address_name'] && $this->_get_value_from_row($row, $tc, 'form_address_name')) ? htmlspecialchars($this->_get_value_from_row($row, $tc, 'form_address_name'), ENT_QUOTES) . '<br />' : '';
+						if ($this->params['form_address_street1'] && $this->_get_value_from_row($row, $tc, 'form_address_street1'))
+							$display .= htmlspecialchars($this->_get_value_from_row($row, $tc, 'form_address_street1'), ENT_QUOTES) . '<br />';
+						if ($this->params['form_address_street2'] && $this->_get_value_from_row($row, $tc, 'form_address_street2'))
+							$display .= htmlspecialchars($this->_get_value_from_row($row, $tc, 'form_address_street2'), ENT_QUOTES) . '<br />';
+						$display .= htmlspecialchars($city_plus, ENT_QUOTES);
+						
+					}
+					// Quotes in the display address will kill the Javascript
+					$display = str_replace('"', '/"', $display);
+					
+					if(!empty($this->params['bubble_template']))
+					{
+						$groups = $this->_get_checkbox_groups_from_form($form, $row);
+						$data = array_merge($row,$groups);
+						foreach($data as $key=>$val)
+						{
+							$new_key = $tc->get_column_label($key);
+							if ($new_key)
+							{
+								$data[$new_key] = $val;
+								unset($data[$key]);
+							}
+						}
+						$display = $this->_get_bubble($this->params['bubble_template'], $data);
+					}
+					
+					// If the viewer isn't logged in, don't show address data
+					if (!$this->logged_in && $this->params['bubble_requires_authentication']) $display = '';
+
+					if (isset($this->geocache[md5($geo_addr)] ))
+					{
+						// If the lat/lon is 0, this wasn't a codeable address, so we just have to throw it out.
+						// Otherwise, we add it to the map.
+						if ($this->geocache[md5($geo_addr)]['lat'] <> 0)
+						{
+							$this->addpoint($map, $this->geocache[md5($geo_addr)]['lat'],  
+								$this->geocache[md5($geo_addr)]['lon'], $display);
+						}
+					}
+
+					// If the lat/lon isn't set, look it up
+					else
+					{
+						// If the address maps, cache the location and map it
+						if ($loc = $this->geocode($geo_addr))
+						{
+							$values['latitude'] = $loc['lat'];
+							$values['longitude'] = $loc['lon'];
+							
+							$this->cachepoint($geo_addr, $loc['lat'],  $loc['lon']);
+							$this->addpoint($map, $loc['lat'], $loc['lon'], $display);
+						} 
+					}		
+				}
+			}
+		}
+	}
+					////////////////////////
+					/*
+					
 					include_once(THOR_INC.'thor_viewer.php');
 					$thor = new ThorViewer();
 					$thor->init_thor_viewer($form_id);
@@ -202,75 +337,7 @@ class MapModule extends DefaultMinisiteModule
 								$geo_addr = $city_plus;
 
 						}
-						// Quotes in the display address will kill the Javascript
-						$display = str_replace('"', '/"', $display);
-						
-						if(!empty($this->params['bubble_template']))
-						{
-							$groups = $this->_get_checkbox_groups_from_form($form, $row);
-							$display = $this->_get_bubble($this->params['bubble_template'], array_merge($row,$groups));
-						}
-						
-						// If the viewer isn't logged in, don't show address data
-						if (!$this->logged_in && $this->params['bubble_requires_authentication']) $display = '';
-
-						if (isset($this->geocache[md5($geo_addr)] ))
-						{
-							// If the lat/lon is 0, this wasn't a codeable address, so we just have to throw it out.
-							// Otherwise, we add it to the map.
-							if ($this->geocache[md5($geo_addr)]['lat'] <> 0)
-							{
-								$this->addpoint($map, $this->geocache[md5($geo_addr)]['lat'],  
-									$this->geocache[md5($geo_addr)]['lon'], $display);
-							}
-						}
-
-						// If the lat/lon isn't set, look it up
-						else
-						{
-							// If the address maps, cache the location and map it
-							if ($loc = $this->geocode($geo_addr))
-							{
-								$values['latitude'] = $loc['lat'];
-								$values['longitude'] = $loc['lon'];
-								
-								$this->cachepoint($geo_addr, $loc['lat'],  $loc['lon']);
-								$this->addpoint($map, $loc['lat'], $loc['lon'], $display);
-							} 
-						}
-
-
-
-						// somehow build up the address using the string in $this->params['form_address_format']
-						$address = '';
-						
-						/*
-						// The following is pseudocode due to confusion over how to use the caching structure
-						// We don't necessarily have netids here, so I'm not sure how to use the geocache array or the 
-						// cachepoint function to manage caching of the data
-						
-						if(!isset($this->geocache[$address]))
-						{
-							if($coords = $this->geocode($address))
-							{
-								$this->cachepoint(???);
-								$this->addpoint($map, $coords['lat'], $coords['lon']);
-							}
-						}
-						else
-						{
-							$this->addpoint($map, $this->geocache[$address]['lat'], $this->geocache[$address]['lon']);
-						}
-						
-						
-						*/
-						
-					}
-					
-				}
-			}
-		}
-	}
+					*/
 	
 	function geocode($address)
 	{
@@ -406,9 +473,13 @@ class MapModule extends DefaultMinisiteModule
 				$this->mapItems[$map->id()] = array_slice($this->mapItems[$map->id()], 0, 500);
 
 			
-
+			$height_style = 'height: '.$map->get_value('map_height').'px;';
+			if ($map->get_value('map_height') == 0) $height_style = 'height: 350px;';
+			$width_style = 'width: '.$map->get_value('map_width').'px;';
+			if ($map->get_value('map_width') == 0) $width_style = '';
+			
 			echo '<h3>' . $this->_get_map_name($map) . '</h3>';
-			echo '<div id="map" style="display: none; width: ' . $map->get_value('map_width') . 'px; height: ' . $map->get_value('map_height') . 'px"></div>';
+			echo '<div id="map" style="display: none; ' . $width_style . $height_style .'"></div>';
 			echo '<p>' . $map->get_value('description') ;
 			if ($this->contains_private_data && !$this->logged_in && $this->params['bubble_requires_authentication']) echo '(<a href="' . REASON_LOGIN_URL . '">Log in</a> to view names and addresses.)';
 			echo '</p>';

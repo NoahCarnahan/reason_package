@@ -17,6 +17,9 @@ function GLoad() {
 					
 	// Initial map options:
 	var initMapOptions = {
+		//center: new google.maps.LatLng(44.46201924941167, -93.15387010574341), //Center on Carleton
+		center: new google.maps.LatLng(38.685527,-96.152435), //Center on the USA
+		zoom: 4,
 		mapTypeControl: true,
 		streetViewControl: false,
 		disableDoubleClickZoom: false,

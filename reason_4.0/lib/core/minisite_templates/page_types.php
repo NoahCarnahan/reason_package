@@ -65,6 +65,36 @@
 		'map' => array(
 			'main_post' => 'map',
 		),
+		'couches_for_carls_map_old' => array(
+			'main' => array(
+				'module' => 'map',
+				'scatter_points' => 250,
+				'form_name' =>'couches_for_carls_form',
+				'form_address_name' => 'id_x8201tv7Jb',
+				'form_address_city' => 'id_Nd39V01338', 
+				'form_address_state' => 'id_oi1H07zV59',
+				'bubble_requires_authentication' => true,
+				'bubble_template' => '<h4>[[id_x8201tv7Jb]] ([[id_4I13F53P16]])</h4>'.
+										'<p class="location">[[id_Nd39V01338]], [[id_oi1H07zV59]]</p>'.
+										'<p class="email"><strong>Email:</strong> [[id_9v01s21tH3]]</p>'.
+										'<p class="notes">[[id_x092j6y322]]</p>',
+			),
+			'main_post' => 'content',
+		),
+		'couches_for_carls_map_new' => array(
+			'main' => array(
+				'module' => 'map',
+				'scatter_points' => 250,
+				'form_name' =>'couches_for_carls_form_new',
+				'form_address_name' => 'Your Name',
+				'form_address_city' => 'City', 
+				'form_address_state' => 'State',
+				'thor_filters' => array('ShowOnMap' => 'Yes'),
+				'bubble_template' => '<h4>[[Your Name]]</h4>'.
+										'<p class="location">[[City]], [[State]]</p>',
+			),
+			'main_post' => 'content',
+		),
 		'a_to_z' => array(
 			'banner_xtra' => '',
 			'navigation' => '',
