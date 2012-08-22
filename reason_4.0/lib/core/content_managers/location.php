@@ -21,7 +21,9 @@
 			
 			$this->head_items->add_javascript(JQUERY_URL, true); // uses jquery - jquery should be at top
 			
-			$this->head_items->add_javascript('/global_stock/js/location_content_manager_v3.js');
+			//$this->head_items->add_javascript('/global_stock/js/location_content_manager_v3.js');
+			$this->head_items->add_javascript('/reason/js/content_managers/location.js');
+			
 		}
 	}
 ?>
