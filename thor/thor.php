@@ -405,6 +405,47 @@ class ThorCore
   		}
 	}
 	
+	/**
+	 * Example usage:
+	 * get_rows_for_keys(array('id_123'=>'Yes', 'id_456'=>'foo'), 'OR') returns all rows where
+	 * the column id_123 has a value of Yes or the column id_456 has a value of foo
+	 *
+	 * @param array $keys array of column, value pairs
+	 * @param string $operator logical operator to connect the keys with. Use AND or OR
+	 * @return array rows associated with the given keys and columns
+	 */
+	function get_rows_for_keys($keys, $operator='AND', $sort_field='',$sort_order='')
+	{
+		$table = $this->get_thor_table();
+		if ($this->get_thor_table() && is_array($keys) && count($keys) >= 1)
+		{
+		if (!get_current_db_connection_name()) connectDB($this->get_db_conn());
+			$reconnect_db = (get_current_db_connection_name() != $this->get_db_conn()) ? get_current_db_connection_name() : false;
+			if ($reconnect_db) connectDB($this->get_db_conn());
+			$q = $this->get_select_by_keys_sql($keys, $operator, $sort_field, $sort_order);
+  			$res = mysql_query($q);
+  			if ($res && mysql_num_rows($res) > 0)
+  			{
+  				while ($row = mysql_fetch_assoc($res))
+  				{
+  					$result[$row['id']] = $row;
+  				}
+  			}
+  			else $result = false;
+  			if ($reconnect_db) connectDB($reconnect_db); // reconnect to default DB
+  			return $result;
+		}
+		elseif (!$this->get_thor_table())
+		{
+			trigger_error('get_rows_for_key called but no table has been defined via the thorCore set_thor_table method');
+  			return NULL;
+		}
+		else
+  		{
+  			return array();
+  		}
+	}
+	
 	function get_rows($sort_field = '', $sort_order = '')
 	{
 		$table = $this->get_thor_table();
@@ -550,6 +591,31 @@ class ThorCore
 			$str .= ' ORDER BY `' . $sort_field . '` ' . $sort_order; 
 		}
 		return $str;
+	}
+	
+	/**
+	 * @param Array $keys array of column, value pairs
+	 * @param String $operator Logical operator to link query parts together. Use 'AND' or 'OR'
+	 * @return String query string
+	 */
+	function get_select_by_keys_sql($keys, $operator, $sort_field = '', $sort_order = '')
+	{
+		if($operator == 'OR' || $operator == 'AND')
+		{
+			$clauses = array();
+			foreach ($keys as $col=>$val)
+			{
+				$clauses[] = addslashes($col) .' = "'.addslashes($val).'"';
+			}
+			$where = ' WHERE ' . implode(' '.addslashes($operator).' ', $clauses);
+			$str = 'SELECT * FROM '.$this->get_thor_table() . $where;
+			if (!empty($sort_field) && !empty($sort_order))
+			{
+				$str .= ' ORDER BY `' . $sort_field . '` ' . $sort_order; 
+			}
+			return $str;
+		}
+		return '';
 	}
 
 	function get_rows_sql($sort_field = '', $sort_order = '')

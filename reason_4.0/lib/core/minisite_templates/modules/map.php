@@ -9,8 +9,18 @@ include_once(THOR_INC . 'thor.php');
 reason_include_once('classes/geocoder.php'); // in core/classes
 
 /**
- * @todo Should there be a message when you should be logged in?
- * @todo figure out what the form_selectset_nav does
+ * Major changes in this version (compared to the Carleton local map.php)
+ * 	- Forms
+ *		- form parameters now should be given thor element labels, not names. So now in page_types
+ *		  We have lines like this: 'form_address_name' => 'Your Name',
+ *		  instead of this: 'form_address_name' => 'id_x8201tv7Jb',
+ *		- When using the 'bubble_template' parameter thor column labels have replaced thor
+ *		  column labels to specify where in the string replacements should take place.
+ *		- Removed the 'form_selectset_nav' parameter
+ *
+ * @todo add a place to specify the filter operator (AND or OR)
+ *
+ * @todo Should $this->contains_private_data be set based on actual things
  * @todo ONLY SUPPORTS ONE FILTER! IS this bad?
  *
  * @todo Remove uneeded includes
@@ -28,7 +38,6 @@ class MapModule extends DefaultMinisiteModule
 		'form_address_state' => '',
 		'form_address_post_code' => '',
 		'form_address_country' => '', 
-		'form_selectset_nav' => array(), // array of select/radio/checkbox ids to provide filtering of form data
 		'thor_filters' => array(), // 'field' => 'value' pairs to limit the results from the form data
 		'bubble_template' => '',
 		'bubble_requires_authentication' => true,
@@ -171,19 +180,24 @@ class MapModule extends DefaultMinisiteModule
 			$table = 'form_' . $form->id();
 			$tc = new ThorCore($xml, $table);
 			
+			echo $tc->get_select_by_keys_sql(array('col1'=>'val1', 'col2'=>'val2'),'AND');
+			
 			if ($this->params['thor_filters'])
 			{
 				//Get filters
-				reset($this->params['thor_filters']);
-				$filter_column = key($this->params['thor_filters']);
-				$filter_value = $this->params['thor_filters'][$filter_column];
-				$rows = $tc->get_rows_for_key($filter_value, $tc->get_column_name($filter_column));
+				$new_filts = array();
+				foreach($this->params['thor_filters'] as $key=>$val)
+				{
+					$new_filts[$tc->get_column_name($key)] = $val; 
+				}
+				$rows = $tc->get_rows_for_keys($new_filts);
 			} else {
 				$rows = $tc->get_rows();
 			}
 			
 			if ($rows)
 			{
+				$this->contains_private_data = true;
 				foreach ($rows as $row)
 				{
 					if ($this->params['form_address_full'])
@@ -271,73 +285,6 @@ class MapModule extends DefaultMinisiteModule
 			}
 		}
 	}
-					////////////////////////
-					/*
-					
-					include_once(THOR_INC.'thor_viewer.php');
-					$thor = new ThorViewer();
-					$thor->init_thor_viewer($form_id);
-					if (count($this->params['thor_filters'])) $thor->set_filters($this->params['thor_filters']);
-					$data = $thor->get_data();
-					if(!empty($data))
-					{
-						$form = new entity($form_id);
-					}
-					
-					$this->contains_private_data = true;
-					
-					//$checkboxgroups = $this->_get_checkbox_groups_from_form($form);
-					$addresses = array();
-					$filter_field = '';
-					if($this->params['form_selectset_nav'])
-					{
-						if(!empty($this->request['map_filter']) && in_array($this->request['map_filter'],$this->params['form_selectset_nav']) )
-						{
-							$filter_field = $this->request['map_filter'];
-							
-						}
-						foreach($this->params['form_selectset_nav'] as $navitem)
-						{
-							$this->_sub_map_markup .= '<a href="?map_filter_id='.urlencode($navitem).'">'.$navitem.'</a> ';
-						}
-					}
-					foreach($data as $row)
-					{
-						if($filter_field && empty($row[$filter_field]))
-							continue;
-						if ($this->params['form_address_full'])
-						{
-							$geo_addr = $row[$this->params['form_address_full']];
-							$display = ($this->params['form_address_name'] && $row[$this->params['form_address_name']]) ? htmlspecialchars($row[$this->params['form_address_name']], ENT_QUOTES) . '<br />' : '';
-							// Someone may want to figure out how to split the address into multiple lines for display
-							$display  .= htmlspecialchars($geo_addr);
-						} else {
-						
-							// Define the display/geocoding versions of the address
-							if ($this->params['form_address_city'] && $row[$this->params['form_address_city']]) 
-								$city_plus = $row[$this->params['form_address_city']] . ', ';
-							if ($this->params['form_address_state'] && $row[$this->params['form_address_state']]) 
-								$city_plus .= $row[$this->params['form_address_state']] . ' ';
-							if ($this->params['form_address_post_code'] && $row[$this->params['form_address_post_code']]) 
-								$city_plus .= $row[$this->params['form_address_post_code']] . ' ';
-							if ($this->params['form_address_country'] && $row[$this->params['form_address_country']]) 
-								$city_plus .= $row[$this->params['form_address_country']] . ' ';
-							$display = ($this->params['form_address_name'] && $row[$this->params['form_address_name']]) ? htmlspecialchars($row[$this->params['form_address_name']], ENT_QUOTES) . '<br />' : '';
-							if ($this->params['form_address_street1'] && $row[$this->params['form_address_street1']]) 
-								$display .= htmlspecialchars($row[$this->params['form_address_street1']], ENT_QUOTES) . '<br />';
-							if ($this->params['form_address_street2'] && $row[$this->params['form_address_street2']]) 
-								$display .= htmlspecialchars($row[$this->params['form_address_street2']], ENT_QUOTES) . '<br />';
-							$display .= htmlspecialchars($city_plus, ENT_QUOTES);
-							
-							if ($this->params['form_address_street2'] && $row[$this->params['form_address_street2']]) 
-								$geo_addr = $row[$this->params['form_address_street2']] . ', ' . $city_plus; 
-							elseif ($this->params['form_address_street1'] && $row[$this->params['form_address_street1']]) 
-								$geo_addr = $row[$this->params['form_address_street1']] . ', ' . $city_plus; 
-							else
-								$geo_addr = $city_plus;
-
-						}
-					*/
 	
 	function geocode($address)
 	{
