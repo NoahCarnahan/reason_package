@@ -2,10 +2,8 @@
 $GLOBALS[ '_module_class_names' ][ basename( __FILE__, '.php' ) ] = 'MapModule';
 reason_include_once( 'minisite_templates/modules/default.php' );
 reason_include_once( 'classes/group_helper.php' );
-//include_once( SETTINGS_INC . 'map_settings.php' );
 include_once( CARL_UTIL_INC . 'dir_service/directory.php' );
 include_once(THOR_INC . 'thor.php');
-//include_once(WEB_PATH . 'alumni/directory/search/person.php');
 reason_include_once('classes/geocoder.php'); // in core/classes
 
 /**
@@ -16,12 +14,14 @@ reason_include_once('classes/geocoder.php'); // in core/classes
  *		  instead of this: 'form_address_name' => 'id_x8201tv7Jb',
  *		- When using the 'bubble_template' parameter thor column labels have replaced thor
  *		  column labels to specify where in the string replacements should take place.
- *		- Removed the 'form_selectset_nav' parameter
+ *		- Removed the 'form_selectset_nav' parameter and the 'map_filter' request variable
+ *		  (No modules seemed to use them)
+ *		- $this->contains_private_data had previously always been set. It is now only set if
+ *		  bubble_requires_authentication is true.
+ *		- Added parameter 'thor_filters_operator' to designate a logical connective to use
+ *		  between filters.
  *
- * @todo add a place to specify the filter operator (AND or OR)
- *
- * @todo Should $this->contains_private_data be set based on actual things
- * @todo ONLY SUPPORTS ONE FILTER! IS this bad?
+ * 
  *
  * @todo Remove uneeded includes
  * @todo Update the suporting javascript to support multiple maps per page.
@@ -39,6 +39,7 @@ class MapModule extends DefaultMinisiteModule
 		'form_address_post_code' => '',
 		'form_address_country' => '', 
 		'thor_filters' => array(), // 'field' => 'value' pairs to limit the results from the form data
+		'thor_filters_operator' => 'OR', // logical conective to link the filters. use AND or OR.
 		'bubble_template' => '',
 		'bubble_requires_authentication' => true,
 		'scatter_points' => false, // boolean or divisor -- smaller numbers equal larger scattering
@@ -46,16 +47,13 @@ class MapModule extends DefaultMinisiteModule
 	
 	var $members;
 	var $mapItems;
-	//var $mapkey;
 	var $maps;
 	var $es;
 	var $geocache = array();
 	var $contains_private_data = false;
 	var $logged_in = false;
 	var $_sub_map_markup = '';
-	var $cleanup_rules = array(
-		'map_filter' => array('function' => 'turn_into_string'), // a field id -- show only pins for which that field is non-empty (thor only)
-	);
+	var $cleanup_rules = array();
 	var $_geocoder;
 
 	
@@ -89,10 +87,8 @@ class MapModule extends DefaultMinisiteModule
 		$addresses = $this->es->run_one();         
 		
 		// If there are addresses associated with this map...
-		//echo '<p>About to check for associated addresses</p>';
 		if (!empty($addresses))
 		{
-			//echo '<p>There are associated addresses</p>';
 			foreach ($addresses as $address) {
 				$lat = $address->get_value('latitude');
 				$lon = $address->get_value('longitude');
@@ -190,14 +186,14 @@ class MapModule extends DefaultMinisiteModule
 				{
 					$new_filts[$tc->get_column_name($key)] = $val; 
 				}
-				$rows = $tc->get_rows_for_keys($new_filts);
+				$op = strtoupper($this->params['thor_filters_operator']);
+				$rows = $tc->get_rows_for_keys($new_filts, $op);
 			} else {
 				$rows = $tc->get_rows();
 			}
 			
 			if ($rows)
 			{
-				$this->contains_private_data = true;
 				foreach ($rows as $row)
 				{
 					if ($this->params['form_address_full'])
@@ -255,7 +251,11 @@ class MapModule extends DefaultMinisiteModule
 					}
 					
 					// If the viewer isn't logged in, don't show address data
-					if (!$this->logged_in && $this->params['bubble_requires_authentication']) $display = '';
+					if (!$this->logged_in && $this->params['bubble_requires_authentication'])
+					{
+						$display = '';
+						$this->contains_private_data = true;
+					}
 
 					if (isset($this->geocache[md5($geo_addr)] ))
 					{

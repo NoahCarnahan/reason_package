@@ -89,7 +89,8 @@
 				'form_address_name' => 'Your Name',
 				'form_address_city' => 'City', 
 				'form_address_state' => 'State',
-				'thor_filters' => array('ShowOnMap' => 'Yes', 'State'=>'PA'),
+				'thor_filters' => array('ShowOnMap' => 'Yes', 'State'=>'UT'),
+				'thor_filters_operator' => 'OR',
 				'bubble_template' => '<h4>[[Your Name]]</h4>'.
 										'<p class="location">[[City]], [[State]]</p>',
 			),
