@@ -20,10 +20,11 @@ reason_include_once('classes/geocoder.php'); // in core/classes
  *		  bubble_requires_authentication is true.
  *		- Added parameter 'thor_filters_operator' to designate a logical connective to use
  *		  between filters.
+ *		- Removed the module's cacheing of geocoded addresses because the geocoder class
+ *		  already does that.
  *
  *
- * @todo Turn off javascript and refresh it a few times. The lat/lons change each time!
- * I don't even...
+ * @todo Understand checkbox stuff...
  * @todo Location types and Maps types should have cool paper map icons on the sidebar
  * perhaps?
  * @todo Is this module intended to be able to map from multiple sources at once? Because it
@@ -57,7 +58,6 @@ class MapModule extends DefaultMinisiteModule
 	var $mapItems;
 	var $maps;
 	var $es;
-	var $geocache = array();
 	var $contains_private_data = false;
 	var $logged_in = false;
 	var $_sub_map_markup = '';
@@ -86,62 +86,62 @@ class MapModule extends DefaultMinisiteModule
 		$this->maps = $this->es->run_one();						
 	}
 
-	function map_addresses($map)
+	function map_locations($map)
 	{
 		$this->es = new entity_selector();
-		$this->es->description = 'Selecting addresses for this map';
+		$this->es->description = 'Selecting locations for this map';
 		$this->es->add_type( id_of('location_type') );
 		$this->es->add_right_relationship( $map->id(), relationship_id_of('map_to_location') );
-		$addresses = $this->es->run_one();         
+		$locations = $this->es->run_one();         
 		
-		// If there are addresses associated with this map...
-		if (!empty($addresses))
+		// If there are locations associated with this map...
+		if (!empty($locations))
 		{
-			foreach ($addresses as $address) {
-				$lat = $address->get_value('latitude');
-				$lon = $address->get_value('longitude');
+			foreach ($locations as $location) {
+				$lat = $location->get_value('latitude');
+				$lon = $location->get_value('longitude');
 
-				// Define the display/geocoding versions of the address
-				if ($address->get_value('city')) $city_plus = $address->get_value('city') . ', ';
-				if ($address->get_value('state_region')) $city_plus .= $address->get_value('state_region') . ' ';
-				if ($address->get_value('postal_code')) $city_plus .= $address->get_value('postal_code') . ' ';
-				if ($address->get_value('country')) $city_plus .= $address->get_value('country') . ' ';
-				$display = $address->get_value('name') . '<br />';
-				if ($address->get_value('street1')) $display .= $address->get_value('street1') . '<br />';
-				if ($address->get_value('street2')) $display .= $address->get_value('street2') . '<br />';
+				// Define the display/geocoding versions of the location
+				if ($location->get_value('city')) $city_plus = $location->get_value('city') . ', ';
+				if ($location->get_value('state_region')) $city_plus .= $location->get_value('state_region') . ' ';
+				if ($location->get_value('postal_code')) $city_plus .= $location->get_value('postal_code') . ' ';
+				if ($location->get_value('country')) $city_plus .= $location->get_value('country') . ' ';
+				$display = $location->get_value('name') . '<br />';
+				if ($location->get_value('street1')) $display .= $location->get_value('street1') . '<br />';
+				if ($location->get_value('street2')) $display .= $location->get_value('street2') . '<br />';
 				$display .= $city_plus;
 				
-				if (empty($city_plus) && ($address->get_value('description')))
+				if (empty($city_plus) && ($location->get_value('description')))
 				{
-					$display .= '<p>'.$address->get_value('description').'</p>';
+					$display .= '<p>'.$location->get_value('description').'</p>';
 				}
 				
 				if(!empty($this->params['bubble_template']))
 				{
-					$display = $this->_get_bubble($this->params['bubble_template'], $address->get_values());
+					$display = $this->_get_bubble($this->params['bubble_template'], $location->get_values());
 				}
 										
 				// If the lat/lon isn't set, look it up
 				if (empty($lat) || empty($lon))
 				{
-					if ($address->get_value('street2')) 
-						$geo_addr = $address->get_value('street2') . ', ' . $city_plus; 
-					elseif ($address->get_value('street1')) 
-						$geo_addr = $address->get_value('street1') . ', ' . $city_plus; 
+					if ($location->get_value('street2')) 
+						$geo_addr = $location->get_value('street2') . ', ' . $city_plus; 
+					elseif ($location->get_value('street1')) 
+						$geo_addr = $location->get_value('street1') . ', ' . $city_plus; 
 					else
 						$geo_addr = $city_plus;
 						
-					// If the address maps, add the location to the address entity and map it
+					// If the location maps, add the lat/lon to the location entity and map it
 					if ($loc = $this->geocode($geo_addr))
 					{
 						$values['latitude'] = $loc['lat'];
 						$values['longitude'] = $loc['lon'];
-						reason_update_entity( $address->id(), get_user_id('root'), $values, false );
+						reason_update_entity( $location->id(), get_user_id('root'), $values, false );
 						$this->addpoint($map, $loc['lat'], $loc['lon'], $display);
 					}
 				// Otherwise, just map it
 				} else {
-					$this->addpoint($map, $address->get_value('latitude'), $address->get_value('longitude'), $display);	
+					$this->addpoint($map, $location->get_value('latitude'), $location->get_value('longitude'), $display);	
 				}
 				
 			}
@@ -183,7 +183,8 @@ class MapModule extends DefaultMinisiteModule
 			$xml = $form->get_value('thor_content');
 			$table = 'form_' . $form->id();
 			$tc = new ThorCore($xml, $table);
-						
+			
+			//Get the apropriate rows from the form			
 			if ($this->params['thor_filters'])
 			{
 				//Get filters
@@ -263,30 +264,11 @@ class MapModule extends DefaultMinisiteModule
 						$this->contains_private_data = true;
 					}
 
-					if (isset($this->geocache[md5($geo_addr)] ))
+					// If the address geocodes, map it.
+					if ($loc = $this->geocode($geo_addr))
 					{
-						// If the lat/lon is 0, this wasn't a codeable address, so we just have to throw it out.
-						// Otherwise, we add it to the map.
-						if ($this->geocache[md5($geo_addr)]['lat'] <> 0)
-						{
-							$this->addpoint($map, $this->geocache[md5($geo_addr)]['lat'],  
-								$this->geocache[md5($geo_addr)]['lon'], $display);
-						}
-					}
-
-					// If the lat/lon isn't set, look it up
-					else
-					{
-						// If the address maps, cache the location and map it
-						if ($loc = $this->geocode($geo_addr))
-						{
-							$values['latitude'] = $loc['lat'];
-							$values['longitude'] = $loc['lon'];
-							
-							$this->cachepoint($geo_addr, $loc['lat'],  $loc['lon']);
-							$this->addpoint($map, $loc['lat'], $loc['lon'], $display);
-						} 
-					}		
+						$this->addpoint($map, $loc['lat'], $loc['lon'], $display);
+					} 		
 				}
 			}
 		}
@@ -300,7 +282,6 @@ class MapModule extends DefaultMinisiteModule
 			$result['lon'] = $result['longitude'];
 			return $result;
 		}
-			
 		return false;
 	}
 	
@@ -319,19 +300,7 @@ class MapModule extends DefaultMinisiteModule
 		}
 		$this->mapItems[$map->id()][] = array('func'=>'showPoint', 'latitude'=>$lat, 'longitude'=>$lon, 'displayText'=> $text, 'icon' => $icon, 'shadow' => $shadow);
 	}
-	
-	function cachepoint($address, $lat, $lon)
-	{
-		$this->geocache[md5($address)] = array('address'=>$address, 'lat'=>$lat, 'lon'=>$lon);
-	}
-	
-	function write_geocache($map)
-	{
-		$fh = fopen(REASON_CACHE_DIR . '/map_' . $map->id() . '.cache','w');
-		fwrite($fh, serialize($this->geocache));
-		fclose($fh);
-	}
-	
+
 	function _get_checkbox_groups_from_form($form, $data = array())
 	{
 		static $form_groups = array();
@@ -398,15 +367,6 @@ class MapModule extends DefaultMinisiteModule
 		return $template;
 	}
 	
-	// Geo coordinates for maps are cached in the file system so that every address doesn't
-	// have to be recoded every time
-	function _get_cache_data($map)
-	{
-		if (file_exists(REASON_CACHE_DIR . '/map_' . $map->id() . '.cache') AND 
-			$cachedata = file_get_contents(REASON_CACHE_DIR . '/map_' . $map->id() . '.cache'))
-				$this->geocache = unserialize($cachedata);			
-	}
-	
 	protected function _get_map_name($map)
 	{
 		return $map->get_value('name');
@@ -414,17 +374,15 @@ class MapModule extends DefaultMinisiteModule
 	
 	function build_map_items($map)
 	{
-		$this->map_addresses($map);
+		$this->map_locations($map);
 		$this->map_from_form($map);
 	}
 	
 	function run()
 	{
 		foreach($this->maps as $map) {
-			$this->_get_cache_data($map);
 			$this->mapItems[$map->id()] = array();
 			$this->build_map_items($map);
-			$this->write_geocache($map);
 
 			//Don't try to display more than 500 points on a map
 			if (count($this->mapItems[$map->id()]) > 500) 
