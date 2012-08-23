@@ -1,17 +1,17 @@
-var map = null;
+var maps = new Array();
 var geocoder = null;
-var bounds = null;
-var infoWindow = null;
+var bounds = new Array();
+var infoWindows = new Array();
 
 /*
  *	Initialize the map.
  */
-function GLoad() {
+function GLoad(mapId) {
 	
 	var standardTileSize = new google.maps.Size(256, 256);
 	
 	//Create the InfoWindow
-	infoWindow = new google.maps.InfoWindow({
+	infoWindows[mapId] = new google.maps.InfoWindow({
 						maxWidth: 200
 					});
 					
@@ -26,25 +26,23 @@ function GLoad() {
 		maxZoom: 19,
 		mapTypeId: google.maps.MapTypeId.ROADMAP
 	}
-	
-	map = new google.maps.Map(document.getElementById("map"), initMapOptions);
-	geocoder = new google.maps.Geocoder();
-	bounds = new google.maps.LatLngBounds();
 
-	map.fitBounds(bounds);
+	maps[mapId] = new google.maps.Map($('.map[data-map-id="'+mapId+'"]')[0], initMapOptions);
+	bounds[mapId] = new google.maps.LatLngBounds();
+	maps[mapId].fitBounds(bounds[mapId]);
 }
 
 /*
  * Add a marker to the map at the given address. Displays the given text when clicked on.
  * Note that this function uses google's geocoding instead of a reason geocode object.
  */
-function showAddress(adr, displayText) {
+function showAddress(mapId, adr, displayText) {
     if (geocoder) { //would this ever be false?
     	geocoder.geocode(
     		{address: adr}, 
     		function(results, status) {
     			if (status == google.maps.GeocoderStatus.OK) {
-    				displayMarker(map, bounds, infoWindow, results[0].geometry.location, displayText);
+    				displayMarker(maps[mapId], bounds[mapId], infoWindows[mapId], results[0].geometry.location, displayText);
 				} else {
 					alert("Sorry " + adr + " not found");
 				}
@@ -56,8 +54,8 @@ function showAddress(adr, displayText) {
  * This function extends the bounds to include the point designated by the given
  * latitude and longitude.
  */
-function extendBounds(lat, lng) {
-	bounds.extend(google.maps.LatLng(lat, lng, true));
+function extendBounds(mapId, lat, lng) {
+	bounds[mapId].extend(google.maps.LatLng(lat, lng, true));
 }
 
 /*
@@ -65,9 +63,9 @@ function extendBounds(lat, lng) {
  * is shown when the marker is clicked on. icon and shadow are optional. icon and shadow
  * should be strings which are the names of javascript variables referring to google.map.MarkerImages.
  */
-function showPoint(lat, lng, displayText, icon, shadow) {
+function showPoint(mapId, lat, lng, displayText, icon, shadow) {
     var point = new google.maps.LatLng(lat, lng, true);
-    displayMarker(map, bounds, infoWindow, point, displayText, icon, shadow);
+    displayMarker(maps[mapId], bounds[mapId], infoWindows[mapId], point, displayText, icon, shadow);
 }
 
 /*
@@ -100,27 +98,32 @@ function displayMarker(map, bounds, infowin, latlng, displayText, icon, shadow) 
 /*
  * Convert the specially formatted list HTML to markers on the map.
  */
-function convertListToMap(){
-	$("#mapInfo").css("visibility", "hidden"); //We hide and remove because the removing is sometimes a bit slow.
-	$("ul.mapCommands > li").each(function(){
+function convertListToMap(mapId){
+	$(".mapInfo[data-map-id='"+mapId+"']").css("visibility", "hidden"); //We hide _and_ remove because the removing is sometimes a bit slow.
+	$("ul.mapCommands[data-map-id='"+mapId+"'] > li").each(function(){
 		if($(this).attr("class") == "showPoint"){
 			var text = $(this).find(".displayText").html();
 			var lat = $(this).find(".latlon > .lat").text();
 			var lon = $(this).find(".latlon > .lon").text();
 			var icon = $(this).find(".icon").html();
 			var shadow = $(this).find(".shadow").html();
-			showPoint(lat, lon, text, icon, shadow);
+			showPoint(mapId, lat, lon, text, icon, shadow);
 		}
 		//NOTE: Add other conditionals here to add support for other interactions with the map.
 	});
-	$("#mapInfo").remove();
+	$(".mapInfo[data-map-id='"+mapId+"']").remove();
 }
 
 $(document).ready(function(){
+	//init geocoder
+	geocoder = new google.maps.Geocoder();
 	//show map element
-	$("#map").css("display","block");
-	//load map
-	GLoad();
-	//display points
-	convertListToMap();
+	$(".map").each(function () {
+		mapId = $(this).attr('data-map-id');
+		$(".map[data-map-id='"+mapId+"']").css("display","block");
+		//load map
+		GLoad(mapId);
+		//display points
+		convertListToMap(mapId);	
+	});
 });

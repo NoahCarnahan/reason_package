@@ -20,20 +20,18 @@ reason_include_once('classes/geocoder.php'); // in core/classes
  *		  bubble_requires_authentication is true.
  *		- Added parameter 'thor_filters_operator' to designate a logical connective to use
  *		  between filters.
- *		- Removed the module's cacheing of geocoded addresses because the geocoder class
+ *		- Removed the module's caching of geocoded addresses because the geocoder class
  *		  already does that.
+ *		- Javascript now supports multiple maps IF a form is not specified. Specifying
+ *		  forms will make it go kablooy
  *
  *
  * @todo Understand checkbox stuff...
- * @todo Location types and Maps types should have cool paper map icons on the sidebar
- * perhaps?
- * @todo Is this module intended to be able to map from multiple sources at once? Because it
- * probably doesn't do that very well... (see next item)
  * @todo There is a problem if you map from addresses and from form at the same time (potentialy)
  * If there is a bubble template, then the bubbles from location type entities just display the template.
  *
+ * @todo Wouldn't it be cool if the map content manager showed you the map?
  * @todo Remove uneeded includes
- * @todo Update the suporting javascript to support multiple maps per page.
  */
 class MapModule extends DefaultMinisiteModule
 {
@@ -102,7 +100,8 @@ class MapModule extends DefaultMinisiteModule
 				$lon = $location->get_value('longitude');
 
 				// Define the display/geocoding versions of the location
-				if ($location->get_value('city')) $city_plus = $location->get_value('city') . ', ';
+				$city_plus = '';
+				if ($location->get_value('city')) $city_plus .= $location->get_value('city') . ', ';
 				if ($location->get_value('state_region')) $city_plus .= $location->get_value('state_region') . ' ';
 				if ($location->get_value('postal_code')) $city_plus .= $location->get_value('postal_code') . ' ';
 				if ($location->get_value('country')) $city_plus .= $location->get_value('country') . ' ';
@@ -394,15 +393,15 @@ class MapModule extends DefaultMinisiteModule
 			if ($map->get_value('map_width') == 0) $width_style = '';
 			
 			echo '<h3>' . $this->_get_map_name($map) . '</h3>';
-			echo '<div id="map" style="display: none; ' . $width_style . $height_style .'"></div>';
+			echo '<div class="map" data-map-id="'.$map->id().'" style="display: none; ' . $width_style . $height_style .'"></div>';
 			echo '<p>' . $map->get_value('description') ;
 			if ($this->contains_private_data && !$this->logged_in && $this->params['bubble_requires_authentication']) echo '(<a href="' . REASON_LOGIN_URL . '">Log in</a> to view names and addresses.)';
 			echo '</p>';
 			
-			echo '<div id="mapInfo">'."\n";
+			echo '<div class="mapInfo" data-map-id="'.$map->id().'">'."\n";
 			echo '<h3>Your browser has javascript disabled and/or it does not support Google maps</h3>'."\n";
 			echo '<h4>The following information would have been displayed on a map: </h4>'."\n";
-			echo '<ul class="mapCommands">'."\n";
+			echo '<ul class="mapCommands" data-map-id="'.$map->id().'">'."\n";
 			foreach($this->mapItems[$map->id()] as $map_entry)
 			{
 				if ($map_entry['func'] == 'showPoint')
