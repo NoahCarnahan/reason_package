@@ -21,7 +21,15 @@ reason_include_once('classes/geocoder.php'); // in core/classes
  *		- Added parameter 'thor_filters_operator' to designate a logical connective to use
  *		  between filters.
  *
- * 
+ *
+ * @todo Turn off javascript and refresh it a few times. The lat/lons change each time!
+ * I don't even...
+ * @todo Location types and Maps types should have cool paper map icons on the sidebar
+ * perhaps?
+ * @todo Is this module intended to be able to map from multiple sources at once? Because it
+ * probably doesn't do that very well... (see next item)
+ * @todo There is a problem if you map from addresses and from form at the same time (potentialy)
+ * If there is a bubble template, then the bubbles from location type entities just display the template.
  *
  * @todo Remove uneeded includes
  * @todo Update the suporting javascript to support multiple maps per page.
@@ -175,9 +183,7 @@ class MapModule extends DefaultMinisiteModule
 			$xml = $form->get_value('thor_content');
 			$table = 'form_' . $form->id();
 			$tc = new ThorCore($xml, $table);
-			
-			echo $tc->get_select_by_keys_sql(array('col1'=>'val1', 'col2'=>'val2'),'AND');
-			
+						
 			if ($this->params['thor_filters'])
 			{
 				//Get filters
@@ -406,19 +412,23 @@ class MapModule extends DefaultMinisiteModule
 		return $map->get_value('name');
 	}
 	
+	function build_map_items($map)
+	{
+		$this->map_addresses($map);
+		$this->map_from_form($map);
+	}
+	
 	function run()
 	{
 		foreach($this->maps as $map) {
 			$this->_get_cache_data($map);
 			$this->mapItems[$map->id()] = array();
-			$this->map_addresses($map);
-			$this->map_from_form($map);
+			$this->build_map_items($map);
 			$this->write_geocache($map);
 
 			//Don't try to display more than 500 points on a map
 			if (count($this->mapItems[$map->id()]) > 500) 
 				$this->mapItems[$map->id()] = array_slice($this->mapItems[$map->id()], 0, 500);
-
 			
 			$height_style = 'height: '.$map->get_value('map_height').'px;';
 			if ($map->get_value('map_height') == 0) $height_style = 'height: 350px;';
