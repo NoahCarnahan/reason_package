@@ -84,15 +84,18 @@
 		'couches_for_carls_map_new' => array(
 			'main' => array(
 				'module' => 'map',
-				'scatter_points' => 250,
-				'form_name' =>'couches_for_carls_form_new',
-				'form_address_name' => 'Your Name',
-				'form_address_city' => 'City', 
-				'form_address_state' => 'State',
-				'thor_filters' => array('ShowOnMap' => 'Yes', 'State'=>'UT'),
-				'thor_filters_operator' => 'OR',
-				'bubble_template' => '<h4>[[Your Name]]</h4>'.
-										'<p class="location">[[City]], [[State]]</p>',
+				'customizations' => array(
+					'couch_map' => array(
+						//'scatter_points' => 250,
+						'form_name' =>'couches_for_carls_form_new',
+						'form_address_name' => 'Your Name',
+						'form_address_city' => 'City', 
+						'form_address_state' => 'State',
+						'thor_filters' => array('ShowOnMap' => 'Yes', 'State'=>'Illinois'),
+						'thor_filters_operator' => 'AND',
+						'bubble_template' => '<h4>[[Your Name]]</h4><p class="location">[[City]], [[State]]</p>',
+					),
+				),
 			),
 			'main_post' => 'content',
 		),

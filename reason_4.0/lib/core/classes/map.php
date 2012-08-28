@@ -1,18 +1,19 @@
 <?php
-
+reason_include_once('classes/geocoder.php');
 class reasonGeopoint
 {
 
 	private static $_geocoder;
 	
-	private var $_label = '';
-	private var $_lat;
-	private var $_lon;
+	private $_label = '';
+	private $_lat;
+	private $_lon;
 
-	function __construct($lat, $lon)
+	function __construct($lat, $lon, $label='')
 	{
-		$this->$_lat = $lat;
-		$this->$_lon = $lon;
+		$this->_lat = $lat;
+		$this->_lon = $lon;
+		$this->_label = $label;
 	}
 	
 	/**
@@ -22,10 +23,31 @@ class reasonGeopoint
 	 */
 	public static function from_location($location)
 	{
-		$latlon = self::get_lat_lon_from_location($location)
+		$latlon = self::get_lat_lon_from_location($location);
 		$point = new reasonGeopoint($latlon['lat'], $latlon['lon']);
 		$point->set_label(self::get_label_from_location($location));
 		return $point;
+	}
+	
+	public static function from_address($address, $label ='')
+	{
+		$latlon = self::get_lat_lon_from_address($address);
+		$point = new reasonGeopoint($latlon['lat'], $latlon['lon'], $label);
+		return $point;
+	}
+	
+	private static function get_lat_lon_from_address($address)
+	{
+		if($latlon = self::geocode($address))
+		{
+			$lat = $latlon['lat'];
+			$lon = $latlon['lon'];
+		}
+		if (!empty($lat) && !empty($lon))
+		{
+			return array('lat'=>$lat, 'lon'=>$lon);
+		}
+		return array();
 	}
 	
 	/**
@@ -51,22 +73,20 @@ class reasonGeopoint
 			if ($location->get_value('postal_code')) $address .= $location->get_value('postal_code') . ' ';
 			if ($location->get_value('country')) $address .= $location->get_value('country') . ' ';
 			
-			if($latlon = self::geocode($address))
+			echo 'HERE!';
+			
+			$latlon = self::get_lat_lon_from_address($address);
+			if ($latlon)
 			{
 				$values = array();
 				$values['latitude'] = $latlon['lat'];
 				$values['longitude'] = $latlon['lon'];
 				reason_update_entity( $location->id(), get_user_id('root'), $values, false );
-				$lat = $latlon['lat'];
-				$lon = $latlon['lon'];
+				return $latlon;
 			}
+			return array();
 		}
-		if (!empty($lat) && !empty($lon))
-		{
-			return array('lat'=>$lat, 'lon'=>$lon);
-		}
-		return array();
-
+		return array('lat'=>$lat, 'lon'=>$lon);
 	}
 	
 	private static function get_label_from_location($location)
@@ -113,37 +133,38 @@ class reasonGeopoint
 	
 	function set_label($label)
 	{
-	
+		$this->_label = $label;
 	}
 	
 	function get_label()
 	{
-	
+		return $this->_label;
 	}
 	
 	function get_latitude()
 	{
-	
+		return $this->_lat;
 	}
 	
 	function get_longitude()
 	{
-	
+		return $this->_lon;
 	}
 }
 
 class reasonMap
 {
-
-	private var $map;
-	private var $geopoints;
+	/**A map entity*/
+	private $_map;
+	/**An array of reasonGeopoint objects*/
+	private $_geopoints = null;
 	
 	/**
 	 * @param object $map A map entity.
 	 */
 	function __construct($map)
 	{
-		$this->map = $map;
+		$this->_map = $map;
 	}
 	
 	/**
@@ -151,23 +172,201 @@ class reasonMap
 	 */
 	function get_geopoints()
 	{
-		if (empty($this->geopoints))
+		if ($this->_geopoints === null)
 		{
 			$es = new entity_selector();
 			$es->description = 'Selecting locations for this map';
 			$es->add_type( id_of('location_type') );
-			$es->add_right_relationship( $this->map->id(), relationship_id_of('map_to_location') );
+			$es->add_right_relationship( $this->_map->id(), relationship_id_of('map_to_location') );
 			$locations = $es->run_one();
 			
-			$this->geopoints = array()
+			$this->_geopoints = array();
 			foreach ($locations as $location)
 			{
-				$this->geopoints[] = reasonGeopoint::from_location($location);
+				$this->_geopoints[] = reasonGeopoint::from_location($location);
 			}
 		}
-		return $this->geopoints;
+		return $this->_geopoints;
 	}
 	
+}
+
+interface reasonMapDisplayer
+{
+	function set_height($height);
+	function set_width($width);
+	function set_name($name);
+	function set_description($description);
+	function set_sub_map_markup($mark);
+	function set_scatter($amount);
+	/**
+	 * Add the given geopoints to be displayed
+	 * @param Array $geopoints An array of reasonGeopoint objects to be added to the map
+	 */
+	function add_geopoints($geopoints);
+	/**
+	 * Add a geopoint to be displayed
+	 * @param Object $geopoint A reasonGeopoint object to be added to the map
+	 */
+	function add_geopoint($geopoint);
+	/**
+	 * Add the necessary javascript to the given head items object
+	 * @param Object $head_items A head items object to add javascript to
+	 */
+	function set_head_items($head_items);
+	/**
+	 * @return String HTML markup to display the map.
+	 */
+	function get_markup();
+}
+
+/**
+ * @todo Should add_geopoints and add_geopoint check to make sure they don't add duplicates?
+ * @todo Things to add: point scattering
+ 						multiple mapping functions
+ 						map description
+ 						private data warning
+ 						limit map to 500 points
+ 						sub map markup
+ * @todo Maybe map name, description, and sub markup should just be controlled by other things?
+ * @todo Should get_markup really be making default height decissions and things like that?
+ */
+class defaultReasonMapDisplayer
+{
+	private static $_last_id = 1;
+
+	private $_geopoints = array();
+	private $_id;
+	private $_width = 0;
+	private $_height = 0;
+	private $_display_limit = 500;
+	private $_name;
+	private $_scatter = false;
+	private $_description; //Note that this will be inside <p> tags.
+	private $_sub_map_markup;
+	
+	function __construct()
+	{
+		self::$_last_id += 1;
+		$this->_id = self::$_last_id;
+	}
+	
+	/**
+	 * Set to null for unlimited
+	 * @param Mixed $lim The maximum number of points to be displayed on the map.
+	 */
+	function set_display_limit($lim)
+	{
+		$this->_display_limit = $lim;
+	}
+	
+	function set_sub_map_markup($mark)
+	{
+		$this->_sub_map_markup = $mark;
+	}
+	
+	function set_name($name)
+	{
+		$this->_name = $name;
+	}
+	
+	function set_description($description)
+	{
+		$this->_description = $description;
+	}
+	
+	function get_description($description)
+	{
+		return $this->_description;
+	}
+	
+	/**
+	 * @param True, False, or an ammount?
+	 */
+	function set_scatter($amount)
+	{
+		$this->_scatter = $amount;
+	}
+	
+	function set_width($width)
+	{
+		$this->_width = $width;
+	}
+	
+	function set_height($height)
+	{
+		$this->_height = $height;
+	}
+	
+	function add_geopoints($geopoints)
+	{
+		$this->_geopoints = array_merge($this->_geopoints, $geopoints);
+	}
+	
+	function add_geopoint($geopoint)
+	{
+		$this->_geopoints[] = $geopoint;
+	}
+	
+	function set_head_items($head_items)
+	{
+		$head_items->add_javascript(JQUERY_URL, true);
+		$head_items->add_javascript('//maps.googleapis.com/maps/api/js?sensor=false');
+		$head_items->add_javascript('/reason/modules/map/google_maps_V3.js');
+
+	}
+	
+	private function apply_scatter($degree)
+	{
+		$scat = $this->_scatter;
+		if ($this->_scatter === true)
+			$scat = 1500;
+		if ($scat)
+			$degree += ( ( rand(0,20) - 10 ) / 10 ) / $scat;
+		return $degree;
+	}
+	
+	function get_markup()
+	{	
+		$points = $this->_geopoints;
+		if ($this->_display_limit != null)
+		{
+			if(count($points) > $this->_display_limit)
+				$points = array_slice($points, 0, $this->_display_limit);
+		}
+	
+		$height_style = 'height: '.$this->_height.'px;';
+		if ($this->_height == 0) $height_style = 'height: 350px;';
+		
+		$width_style = 'width: '.$this->_width.'px;';
+		if ($this->_width == 0) $width_style = '';
+	
+		$buf = '';
+		if (!empty($this->_name))
+		$buf .= '<h3>' . $this->_name . '</h3>'."\n";
+		if (!empty($this->_description))
+			$buf .= '<p>' . $this->_description . '</p>'."\n";
+		$buf .= '<div class="map" data-map-id="'.strval($this->_id).'" style="display: none; ' . $width_style . $height_style .'"></div>'."\n";
+		$buf .= '<div class="mapInfo" data-map-id="'.strval($this->_id).'">'."\n";
+		$buf .= '<h3>Your browser has javascript disabled and/or it does not support Google maps</h3>'."\n";
+		$buf .= '<h4>The following information would have been displayed on a map:</h4>'."\n";
+		$buf .= '<ul class="mapCommands" data-map-id="'.strval($this->_id).'">'."\n";
+		foreach($points as $point)
+		{
+			$buf .= '<li class = "showPoint">'."\n";
+			$buf .= '<div class="displayText">'.$point->get_label().'</div>'."\n";
+			$buf .= '<div class="latlon"><span class="lat">'.$this->apply_scatter($point->get_latitude()).'</span>, <span class="lon">'.$this->apply_scatter($point->get_longitude()).'</span></div>'."\n";
+			$buf .= '<div class="icon" style="visibility:hidden;"></div>'."\n";
+			$buf .= '<div class="shadow" style="visibility:hidden;"></div>'."\n";
+			$buf .= '</li>'."\n";
+		}
+		$buf .= '</ul>'."\n";
+		$buf .= '</div>'."\n";
+		if (!empty($this->_sub_map_markup))
+			$buf .= '<div class="subForm">'.$this->_sub_map_markup.'</div>'."\n";
+			
+		return $buf;
+	}
 }
 
 ?> 
