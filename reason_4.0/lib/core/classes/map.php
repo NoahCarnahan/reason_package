@@ -199,6 +199,7 @@ interface reasonMapDisplayer
 	function set_description($description);
 	function set_sub_map_markup($mark);
 	function set_scatter($amount);
+	function set_display_limit($lim);
 	/**
 	 * Add the given geopoints to be displayed
 	 * @param Array $geopoints An array of reasonGeopoint objects to be added to the map

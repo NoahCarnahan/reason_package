@@ -92,6 +92,7 @@ class MapModule extends DefaultMinisiteModule
 			$this->map_displayers[$map->id()]->set_name($map->get_value('name'));
 			$this->map_displayers[$map->id()]->set_description($map->get_value('description'));
 			$this->map_displayers[$map->id()]->set_sub_map_markup($this->_sub_map_markup);
+			$this->map_displayers[$map->id()]->set_display_limit(500);
 			$scat = $this->get_param($map, 'scatter_points');
 			if ($scat == null) $scat = false;
 			$this->map_displayers[$map->id()]->set_scatter($scat);

@@ -22,6 +22,7 @@ class map_previewer extends default_previewer
 		$this->map_displayer->set_width($this->get_value('map_width'));
 		$this->map_displayer->set_name('Map preview:');
 		$this->map_displayer->set_description($this->get_value('description'));
+		$this->map_displayer->set_display_limit(500);
 		$this->map_displayer->add_geopoints($this->reason_map->get_geopoints());
 	}
 
