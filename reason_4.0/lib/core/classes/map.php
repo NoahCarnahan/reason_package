@@ -313,8 +313,7 @@ class defaultReasonMapDisplayer
 	{
 		$head_items->add_javascript(JQUERY_URL, true);
 		$head_items->add_javascript('//maps.googleapis.com/maps/api/js?sensor=false');
-		$head_items->add_javascript('/reason/modules/map/google_maps_V3.js');
-
+		$head_items->add_javascript(REASON_HTTP_BASE_PATH.'/modules/map/google_maps_V3.js');
 	}
 	
 	private function apply_scatter($degree)
