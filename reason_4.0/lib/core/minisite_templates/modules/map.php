@@ -35,7 +35,7 @@ reason_include_once('classes/map.php'); // in core/classes
  * that extend this one make use of it?
  *
  * @todo Remove uneeded includes
- */
+ */ 
 class MapModule extends DefaultMinisiteModule
 {
 	/**
@@ -117,7 +117,7 @@ class MapModule extends DefaultMinisiteModule
 	 * @param String $param The name of the page_types parameter te be retrieved
 	 * @return Mixed 
 	 */
-	private function get_param($map, $param)
+	function get_param($map, $param)
 	{
 		if (isset($this->params['customizations'][$map->get_value('unique_name')]))
 		{

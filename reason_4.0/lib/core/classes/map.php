@@ -1,4 +1,8 @@
 <?php
+/**
+ * I don't love the way icons and shadows work...
+ * @author Noah Carnahan
+ */
 reason_include_once('classes/geocoder.php');
 class reasonGeopoint
 {
@@ -8,12 +12,21 @@ class reasonGeopoint
 	private $_label = '';
 	private $_lat;
 	private $_lon;
-
-	function __construct($lat, $lon, $label='')
+	
+	private $_icon ='';
+	private $_shadow ='';
+	
+	/**
+	 * @param String $icon The name of a javascript variable pointing to a google.maps.MarkerImage
+	 * @param String $shadow The name of a javascript variable pointing to a google.maps.MarkerImage
+	 */
+	function __construct($lat, $lon, $label='', $icon='',$shadow='')
 	{
 		$this->_lat = $lat;
 		$this->_lon = $lon;
 		$this->_label = $label;
+		$this->_icon = $icon;
+		$this->_shadow = $shadow;
 	}
 	
 	/**
@@ -24,7 +37,10 @@ class reasonGeopoint
 	public static function from_location($location)
 	{
 		$latlon = self::get_lat_lon_from_location($location);
-		$point = new reasonGeopoint($latlon['lat'], $latlon['lon']);
+		if (!empty($latlon))
+			$point = new reasonGeopoint($latlon['lat'], $latlon['lon']);
+		else
+			$point = new reasonGeopoint(null, null);
 		$point->set_label(self::get_label_from_location($location));
 		return $point;
 	}
@@ -32,7 +48,10 @@ class reasonGeopoint
 	public static function from_address($address, $label ='')
 	{
 		$latlon = self::get_lat_lon_from_address($address);
-		$point = new reasonGeopoint($latlon['lat'], $latlon['lon'], $label);
+		if(!empty($latlon))
+			$point = new reasonGeopoint($latlon['lat'], $latlon['lon'], $label);
+		else
+			$point = new reasonGeopoint(null, null, $label);
 		return $point;
 	}
 	
@@ -150,6 +169,15 @@ class reasonGeopoint
 	{
 		return $this->_lon;
 	}
+	
+	function get_icon()
+	{
+		return $this->_icon;
+	}
+	function get_shadow()
+	{
+		return $this->_shadow;
+	}
 }
 
 class reasonMap
@@ -236,15 +264,15 @@ class defaultReasonMapDisplayer
 {
 	private static $_last_id = 1;
 
-	private $_geopoints = array();
-	private $_id;
-	private $_width = 0;
-	private $_height = 0;
-	private $_display_limit = 500;
-	private $_name;
-	private $_scatter = false;
-	private $_description; //Note that this will be inside <p> tags.
-	private $_sub_map_markup;
+	public $_geopoints = array();
+	public $_id;
+	public $_width = 0;
+	public $_height = 0;
+	public $_display_limit = 500;
+	public $_name;
+	public $_scatter = false;
+	public $_description; //Note that this will be inside <p> tags.
+	public $_sub_map_markup;
 	
 	function __construct()
 	{
@@ -276,7 +304,7 @@ class defaultReasonMapDisplayer
 		$this->_description = $description;
 	}
 	
-	function get_description($description)
+	function get_description()
 	{
 		return $this->_description;
 	}
@@ -316,7 +344,7 @@ class defaultReasonMapDisplayer
 		$head_items->add_javascript(REASON_HTTP_BASE_PATH.'/modules/map/google_maps_V3.js');
 	}
 	
-	private function apply_scatter($degree)
+	function apply_scatter($degree)
 	{
 		$scat = $this->_scatter;
 		if ($this->_scatter === true)
@@ -326,26 +354,25 @@ class defaultReasonMapDisplayer
 		return $degree;
 	}
 	
-	function get_markup()
-	{	
+	/**
+	 * Returns the markup for the map without any headings or descriptions
+	 */
+	function get_map_only_markup()
+	{
 		$points = $this->_geopoints;
 		if ($this->_display_limit != null)
 		{
 			if(count($points) > $this->_display_limit)
 				$points = array_slice($points, 0, $this->_display_limit);
 		}
-	
+		
 		$height_style = 'height: '.$this->_height.'px;';
 		if ($this->_height == 0) $height_style = 'height: 350px;';
 		
 		$width_style = 'width: '.$this->_width.'px;';
 		if ($this->_width == 0) $width_style = '';
-	
+		
 		$buf = '';
-		if (!empty($this->_name))
-		$buf .= '<h3>' . $this->_name . '</h3>'."\n";
-		if (!empty($this->_description))
-			$buf .= '<p>' . $this->_description . '</p>'."\n";
 		$buf .= '<div class="map" data-map-id="'.strval($this->_id).'" style="display: none; ' . $width_style . $height_style .'"></div>'."\n";
 		$buf .= '<div class="mapInfo" data-map-id="'.strval($this->_id).'">'."\n";
 		$buf .= '<h3>Your browser has javascript disabled and/or it does not support Google maps</h3>'."\n";
@@ -353,15 +380,31 @@ class defaultReasonMapDisplayer
 		$buf .= '<ul class="mapCommands" data-map-id="'.strval($this->_id).'">'."\n";
 		foreach($points as $point)
 		{
-			$buf .= '<li class = "showPoint">'."\n";
-			$buf .= '<div class="displayText">'.$point->get_label().'</div>'."\n";
-			$buf .= '<div class="latlon"><span class="lat">'.$this->apply_scatter($point->get_latitude()).'</span>, <span class="lon">'.$this->apply_scatter($point->get_longitude()).'</span></div>'."\n";
-			$buf .= '<div class="icon" style="visibility:hidden;"></div>'."\n";
-			$buf .= '<div class="shadow" style="visibility:hidden;"></div>'."\n";
-			$buf .= '</li>'."\n";
+			if ($point->get_latitude() && $point->get_longitude())
+			{
+				$buf .= '<li class = "showPoint">'."\n";
+				$buf .= '<div class="displayText">'.$point->get_label().'</div>'."\n";
+				$buf .= '<div class="latlon"><span class="lat">'.$this->apply_scatter($point->get_latitude()).'</span>, <span class="lon">'.$this->apply_scatter($point->get_longitude()).'</span></div>'."\n";
+				$buf .= '<div class="icon" style="visibility:hidden;">'.$point->get_icon().'</div>'."\n";
+				$buf .= '<div class="shadow" style="visibility:hidden;">'.$point->get_shadow().'</div>'."\n";
+				$buf .= '</li>'."\n";
+			}
 		}
 		$buf .= '</ul>'."\n";
 		$buf .= '</div>'."\n";
+		return $buf;
+	}
+	/**
+	 * Returns the markup for the map including headings, titles, and descriptions.
+	 */
+	function get_markup()
+	{
+		$buf = '';
+		if (!empty($this->_name))
+			$buf .= '<h3>' . $this->_name . '</h3>'."\n";
+		if (!empty($this->_description))
+			$buf .= '<p>' . $this->_description . '</p>'."\n";
+		$buf .= $this->get_map_only_markup();
 		if (!empty($this->_sub_map_markup))
 			$buf .= '<div class="subForm">'.$this->_sub_map_markup.'</div>'."\n";
 			
